@@ -1,6 +1,8 @@
 package discovery
 
 import (
+	"context"
+
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/registry"
 	"google.golang.org/grpc/resolver"
@@ -19,15 +21,15 @@ func WithLogger(logger log.Logger) Option {
 }
 
 type builder struct {
-	registry registry.Registry
-	logger   log.Logger
+	discoverer registry.Discoverer
+	logger     log.Logger
 }
 
 // NewBuilder creates a builder which is used to factory registry resolvers.
-func NewBuilder(r registry.Registry, opts ...Option) resolver.Builder {
+func NewBuilder(r registry.Discoverer, opts ...Option) resolver.Builder {
 	b := &builder{
-		registry: r,
-		logger:   log.DefaultLogger,
+		discoverer: r,
+		logger:     log.DefaultLogger,
 	}
 	for _, o := range opts {
 		o(b)
@@ -36,7 +38,7 @@ func NewBuilder(r registry.Registry, opts ...Option) resolver.Builder {
 }
 
 func (d *builder) Build(target resolver.Target, cc resolver.ClientConn, opts resolver.BuildOptions) (resolver.Resolver, error) {
-	w, err := d.registry.Watch(target.Endpoint)
+	w, err := d.discoverer.Watch(context.Background(), target.Endpoint)
 	if err != nil {
 		return nil, err
 	}

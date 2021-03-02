@@ -110,7 +110,7 @@ func NewServer(opts ...ServerOption) *Server {
 	return srv
 }
 
-// RouteGroup .
+// RouteGroup returns a new route group for the URL path prefix.
 func (s *Server) RouteGroup(prefix string) *RouteGroup {
 	return &RouteGroup{prefix: prefix, router: s.router}
 }
@@ -123,6 +123,11 @@ func (s *Server) Handle(path string, h http.Handler) {
 // HandleFunc registers a new route with a matcher for the URL path.
 func (s *Server) HandleFunc(path string, h http.HandlerFunc) {
 	s.router.HandleFunc(path, h)
+}
+
+// PrefixHanlde  registers a new route with a matcher for the URL path prefix.
+func (s *Server) PrefixHanlde(prefix string, h http.Handler) {
+	s.router.PathPrefix(prefix).Handler(h)
 }
 
 // ServeHTTP should write reply headers and data to the ResponseWriter and then return.
@@ -139,7 +144,9 @@ func (s *Server) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	if s.middleware != nil {
 		h = s.middleware(h)
 	}
-	h(ctx, req.WithContext(ctx))
+	if _, err := h(ctx, req.WithContext(ctx)); err != nil {
+		s.errorEncoder(res, req, err)
+	}
 }
 
 // Endpoint return a real address to registry endpoint.
