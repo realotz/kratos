@@ -50,7 +50,7 @@ func generateFile(gen *protogen.Plugin, file *protogen.File) *protogen.Generated
 	g.P("import {request} from 'umi';")
 	g.P()
 
-	g.P(fmt.Sprintf("const APIService = '/api/%s';", file.Desc.Package()))
+	g.P(fmt.Sprintf("const APIService = '/api';"))
 	generateFileContent(gen, file, g)
 	return g
 }
