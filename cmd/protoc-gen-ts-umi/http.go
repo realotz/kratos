@@ -69,17 +69,33 @@ func generateFileContent(gen *protogen.Plugin, file *protogen.File, g *protogen.
 		genService(gen, file, g, service)
 	}
 	g.P(fmt.Sprintf("declare namespace %s {", file.Desc.Name()))
+	messagesChan := make(chan protoreflect.MessageDescriptor, len(file.Messages))
 	for _, message := range file.Messages {
-		genMessage(gen, file, g, message)
+		messagesChan <- message.Desc
+	}
+	hash := make(map[protoreflect.Name]struct{})
+	for len(messagesChan) > 0 {
+		genMessage(file, g, <-messagesChan, messagesChan, hash)
 	}
 	g.P(fmt.Sprintf("}"))
 }
 
-func genMessage(gen *protogen.Plugin, file *protogen.File, g *protogen.GeneratedFile, message *protogen.Message) {
-	g.P(fmt.Sprintf("	/** %s %s  */", message.Desc.Name(), message.Comments.Leading.String()))
-	g.P(fmt.Sprintf("	type %s = {", message.Desc.Name()))
-	for _, v := range message.Fields {
-		g.P(fmt.Sprintf("		%s?:%s", v.Desc.Name(), messageKindType(file, v.Desc)))
+func genMessage(file *protogen.File, g *protogen.GeneratedFile, message protoreflect.MessageDescriptor, ch chan protoreflect.MessageDescriptor, hash map[protoreflect.Name]struct{}) {
+	if _, ok := hash[message.Name()]; ok {
+		return
+	}
+	hash[message.Name()] = struct{}{}
+	g.P(fmt.Sprintf("	/** %s */", message.Name()))
+	g.P(fmt.Sprintf("	type %s = {", message.Name()))
+	fields := message.Fields()
+	for i := 0; i < fields.Len(); i++ {
+		field := fields.Get(i)
+		if field.Kind() == protoreflect.MessageKind {
+			if _, ok := hash[field.Message().Name()]; !ok {
+				ch <- field.Message()
+			}
+		}
+		g.P(fmt.Sprintf("		%s?:%s", field.Name(), messageKindType(file, field)))
 	}
 	g.P(fmt.Sprintf("	}"))
 }
