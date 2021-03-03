@@ -130,7 +130,7 @@ func genService(gen *protogen.Plugin, file *protogen.File, g *protogen.Generated
 		c = strings.ReplaceAll(c, "//", "")
 		c = strings.ReplaceAll(c, "\n", "")
 
-		g.P(fmt.Sprintf("/** %s %s /api%s */", method.Name, c, method.Path))
+		g.P(fmt.Sprintf("/** %s %s /api */", method.Name))
 		g.P(fmt.Sprintf("export async function %s(params: %s.%s, options?: Options) {", method.Name, file.Desc.Name(), method.Request))
 		g.P(fmt.Sprintf("	return request<%s.%s>(APIService + '%s', {", file.Desc.Name(), method.Reply, method.Path))
 		g.P(fmt.Sprintf("    	method: '%s',", method.Method))
