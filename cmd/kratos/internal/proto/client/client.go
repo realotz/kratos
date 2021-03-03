@@ -97,6 +97,6 @@ func generate(proto string) error {
 		return err
 	}
 	fmt.Printf("proto: %s\n", proto)
-	fmt.Printf("coomand: protoc %s \n", strings.Join(args, " "))
+	fmt.Printf("comand: protoc %s \n", strings.Join(args, " "))
 	return nil
 }
