@@ -74,7 +74,7 @@ func walk(dir string) error {
 // generate is used to execute the generate command for the specified proto file
 func generate(proto string) error {
 	path, name := filepath.Split(proto)
-	fd := exec.Command("protoc", []string{
+	args := []string{
 		"--proto_path=.",
 		"--proto_path=" + filepath.Join(base.KratosMod(), "api"),
 		"--proto_path=" + filepath.Join(base.KratosMod(), "third_party"),
@@ -83,8 +83,13 @@ func generate(proto string) error {
 		"--go-grpc_out=paths=source_relative:.",
 		"--go-http_out=paths=source_relative:.",
 		"--go-errors_out=paths=source_relative:.",
-		name,
-	}...)
+	}
+	// ts umi为可选项 只在安装 protoc-gen-ts-umi情况下生成
+	if err := look("protoc-gen-ts-umi"); err == nil {
+		args = append(args, "--ts-umi_out=paths=source_relative:.")
+	}
+	args = append(args, name)
+	fd := exec.Command("protoc", args...)
 	fd.Stdout = os.Stdout
 	fd.Stderr = os.Stderr
 	fd.Dir = path
@@ -92,5 +97,6 @@ func generate(proto string) error {
 		return err
 	}
 	fmt.Printf("proto: %s\n", proto)
+	fmt.Printf("coomand: protoc %s \n", strings.Join(args, " "))
 	return nil
 }

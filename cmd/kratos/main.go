@@ -11,7 +11,7 @@ import (
 
 var (
 	// Version is the version of the compiled software.
-	Version string = "v2.0.0-alpha4"
+	Version string = "v2.0.0-local"
 
 	rootCmd = &cobra.Command{
 		Use:     "kratos",
