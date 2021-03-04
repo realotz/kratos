@@ -151,19 +151,34 @@ func genMessage(file *protogen.File, g *protogen.GeneratedFile, message protoref
 }
 
 func messageKindType(file *protogen.File, desc protoreflect.FieldDescriptor) string {
+	if desc.IsMap() {
+		return fmt.Sprintf("Map<%s,%s>", messageKindType(file, desc.MapKey()), messageKindType(file, desc.MapValue()))
+	}
 	switch desc.Kind() {
 	case protoreflect.BoolKind:
+		if desc.IsList() {
+			return "Array<boolean>"
+		}
 		return "boolean"
 	case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Uint64Kind,
 		protoreflect.Uint32Kind, protoreflect.Int64Kind, protoreflect.Sint64Kind,
 		protoreflect.Sfixed32Kind, protoreflect.Fixed32Kind, protoreflect.FloatKind,
 		protoreflect.Sfixed64Kind, protoreflect.Fixed64Kind, protoreflect.DoubleKind:
+		if desc.IsList() {
+			return "Array<number>"
+		}
 		return "number"
 	case protoreflect.MessageKind:
+		if desc.IsList() {
+			return fmt.Sprintf("Array<%s.%s>", Marshal(desc.Message().ParentFile().Package()), string(desc.Message().Name()))
+		}
 		return fmt.Sprintf("%s.%s", Marshal(desc.Message().ParentFile().Package()), string(desc.Message().Name()))
 	case protoreflect.EnumKind:
 		return "Array<any>"
 	default:
+		if desc.IsList() {
+			return "Array<string>"
+		}
 		return "string"
 	}
 }
