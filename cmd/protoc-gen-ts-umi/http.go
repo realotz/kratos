@@ -78,35 +78,73 @@ func generateFileContent(gen *protogen.Plugin, file *protogen.File, g *protogen.
 			genService(gen, file, g, service)
 		}
 	} else {
-		g.P(fmt.Sprintf("declare namespace %s {", file.Desc.Name()))
-		messagesChan := make(chan protoreflect.MessageDescriptor, len(file.Messages))
+		messagesChan := make(chan protoreflect.MessageDescriptor, len(file.Messages)*10)
 		for _, message := range file.Messages {
 			messagesChan <- message.Desc
 		}
-		hash := make(map[protoreflect.Name]struct{})
+		hash := make(map[protoreflect.FullName]map[protoreflect.Name]protoreflect.MessageDescriptor)
 		for len(messagesChan) > 0 {
-			genMessage(file, g, <-messagesChan, messagesChan, hash)
+			getMessage(<-messagesChan, messagesChan, hash)
 		}
-		g.P(fmt.Sprintf("}"))
+		for k, v := range hash {
+			g.P(fmt.Sprintf("declare namespace %s {", k))
+			for _, m := range v {
+				genMessage(file, g, m)
+			}
+			g.P(fmt.Sprintf("}"))
+			g.P()
+		}
+
 	}
 
 }
 
-func genMessage(file *protogen.File, g *protogen.GeneratedFile, message protoreflect.MessageDescriptor, ch chan protoreflect.MessageDescriptor, hash map[protoreflect.Name]struct{}) {
-	if _, ok := hash[message.Name()]; ok {
-		return
+func Marshal(fullname protoreflect.FullName) protoreflect.FullName {
+	name := string(fullname)
+	if name == "" {
+		return ""
 	}
-	hash[message.Name()] = struct{}{}
+	temp := strings.Split(name, ".")
+	var s string
+	for _, v := range temp {
+		vv := []rune(v)
+		if len(vv) > 0 {
+			if bool(vv[0] >= 'a' && vv[0] <= 'z') { //首字母大写
+				vv[0] -= 32
+			}
+			s += string(vv)
+		}
+	}
+	return protoreflect.FullName(s)
+}
+
+func getMessage(message protoreflect.MessageDescriptor,
+	ch chan protoreflect.MessageDescriptor, hash map[protoreflect.FullName]map[protoreflect.Name]protoreflect.MessageDescriptor) {
+	if _, ok := hash[Marshal(message.ParentFile().Package())]; ok {
+		if _, ok := hash[Marshal(message.ParentFile().Package())][message.Name()]; ok {
+			return
+		}
+	} else {
+		hash[Marshal(message.ParentFile().Package())] = make(map[protoreflect.Name]protoreflect.MessageDescriptor)
+	}
+	hash[Marshal(message.ParentFile().Package())][message.Name()] = message
+	fields := message.Fields()
+	for i := 0; i < fields.Len(); i++ {
+		field := fields.Get(i)
+		if field.Kind() == protoreflect.MessageKind {
+			if _, ok := hash[message.ParentFile().Package()][field.Message().Name()]; !ok {
+				ch <- field.Message()
+			}
+		}
+	}
+}
+
+func genMessage(file *protogen.File, g *protogen.GeneratedFile, message protoreflect.MessageDescriptor) {
 	g.P(fmt.Sprintf("	/** %s */", message.Name()))
 	g.P(fmt.Sprintf("	type %s = {", message.Name()))
 	fields := message.Fields()
 	for i := 0; i < fields.Len(); i++ {
 		field := fields.Get(i)
-		if field.Kind() == protoreflect.MessageKind {
-			if _, ok := hash[field.Message().Name()]; !ok {
-				ch <- field.Message()
-			}
-		}
 		g.P(fmt.Sprintf("		%s?:%s", field.Name(), messageKindType(file, field)))
 	}
 	g.P(fmt.Sprintf("	}"))
@@ -122,7 +160,7 @@ func messageKindType(file *protogen.File, desc protoreflect.FieldDescriptor) str
 		protoreflect.Sfixed64Kind, protoreflect.Fixed64Kind, protoreflect.DoubleKind:
 		return "number"
 	case protoreflect.MessageKind:
-		return fmt.Sprintf("%s.%s", file.Desc.Name(), string(desc.Message().Name()))
+		return fmt.Sprintf("%s.%s", Marshal(desc.Message().ParentFile().Package()), string(desc.Message().Name()))
 	case protoreflect.EnumKind:
 		return "Array<any>"
 	default:
@@ -159,8 +197,8 @@ func genService(gen *protogen.Plugin, file *protogen.File, g *protogen.Generated
 		c = strings.ReplaceAll(c, "\n", "")
 
 		g.P(fmt.Sprintf("/** %s %s /api */", method.Name, c))
-		g.P(fmt.Sprintf("export async function %s(params: %s.%s, options?: Options) {", method.Name, file.Desc.Name(), method.Request))
-		g.P(fmt.Sprintf("	return request<%s.%s>(APIService + '%s', {", file.Desc.Name(), method.Reply, method.Path))
+		g.P(fmt.Sprintf("export async function %s(params: %s.%s, options?: Options) {", method.Name, Marshal(file.Desc.Package()), method.Request))
+		g.P(fmt.Sprintf("	return request<%s.%s>(APIService + '%s', {", Marshal(file.Desc.Package()), method.Reply, method.Path))
 		g.P(fmt.Sprintf("    	method: '%s',", method.Method))
 		if method.Body != "" {
 			g.P(fmt.Sprintf("		headers: {'Content-Type': 'application/json',},"))
