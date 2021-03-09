@@ -41,9 +41,9 @@ func run(cmd *cobra.Command, args []string) {
 		}
 	}
 	if strings.HasSuffix(proto, ".proto") {
-		err = generate(proto)
+		err = generate(proto, args)
 	} else {
-		err = walk(proto)
+		err = walk(proto, args)
 	}
 	if err != nil {
 		fmt.Println(err)
@@ -59,7 +59,7 @@ func look(name ...string) error {
 	return nil
 }
 
-func walk(dir string) error {
+func walk(dir string, args []string) error {
 	if dir == "" {
 		dir = "."
 	}
@@ -67,13 +67,21 @@ func walk(dir string) error {
 		if ext := filepath.Ext(path); ext != ".proto" {
 			return nil
 		}
-		return generate(path)
+		return generate(path, args)
 	})
 }
 
+func isValueInList(value string, list []string) bool {
+	for _, v := range list {
+		if v == value {
+			return true
+		}
+	}
+	return false
+}
+
 // generate is used to execute the generate command for the specified proto file
-func generate(proto string) error {
-	path, name := filepath.Split(proto)
+func generate(proto string, localArgs []string) error {
 	args := []string{
 		"--proto_path=.",
 		"--proto_path=" + filepath.Join(base.KratosMod(), "api"),
@@ -86,17 +94,22 @@ func generate(proto string) error {
 	}
 	// ts umi为可选项 只在安装 protoc-gen-ts-umi情况下生成
 	if err := look("protoc-gen-ts-umi"); err == nil {
-		args = append(args, "--ts-umi_out=paths=source_relative:.")
+		if len(localArgs) > 1 && isValueInList("ts", localArgs[1:]) {
+			args = append(args, "--ts-umi_out=paths=source_relative:.")
+		}
 	}
-	args = append(args, name)
+	if len(localArgs) > 1 && isValueInList("vendor", localArgs[1:]) {
+		args = append(args, "--proto_path=./vendor")
+	}
+	args = append(args, proto)
 	fd := exec.Command("protoc", args...)
 	fd.Stdout = os.Stdout
 	fd.Stderr = os.Stderr
-	fd.Dir = path
+	//fd.Dir = path
 	if err := fd.Run(); err != nil {
+		fmt.Printf("comand: protoc %s \n", strings.Join(args, " "))
 		return err
 	}
 	fmt.Printf("proto: %s\n", proto)
-	fmt.Printf("comand: protoc %s \n", strings.Join(args, " "))
 	return nil
 }

@@ -1,4 +1,4 @@
-module github.com/go-kratos/kratos/cmd/protoc-gen-ts-umi/v2
+module github.com/realotz/protoc-gen-ts-umi
 
 go 1.15
 
