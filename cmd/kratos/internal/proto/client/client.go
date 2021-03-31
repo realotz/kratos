@@ -93,13 +93,14 @@ func generate(proto string, localArgs []string) error {
 		"--go-errors_out=paths=source_relative:.",
 	}
 	// ts umi为可选项 只在安装 protoc-gen-ts-umi情况下生成
-	if err := look("protoc-gen-ts-umi"); err == nil {
-		if len(localArgs) > 1 && isValueInList("ts", localArgs[1:]) {
-			args = append(args, "--ts-umi_out=paths=source_relative:.")
+	for _, v := range localArgs[1:] {
+		if v == "vendor" {
+			args = append(args, "--proto_path=./vendor")
+		} else {
+			if err := look(fmt.Sprintf("protoc-gen-%s", v)); err == nil {
+				args = append(args, fmt.Sprintf("--%s_out=paths=source_relative:.", v))
+			}
 		}
-	}
-	if len(localArgs) > 1 && isValueInList("vendor", localArgs[1:]) {
-		args = append(args, "--proto_path=./vendor")
 	}
 	args = append(args, proto)
 	fd := exec.Command("protoc", args...)
